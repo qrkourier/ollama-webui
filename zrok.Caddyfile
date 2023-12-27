@@ -1,0 +1,55 @@
+
+# Multiple Backends Example
+#
+{
+    # no listen on 2019/tcp with admin API
+    admin off
+}
+
+(reverse_proxy_litellm) {
+    reverse_proxy http://litellm:8000 {
+        header_up Host litellm
+    }
+}
+
+(reverse_proxy_ollama) {
+    reverse_proxy http://ollama:11434 {
+        header_up Host ollama
+    }
+}
+
+
+http:// {
+    # Bind to the zrok share
+    bind {{ .ZrokBindAddress }}
+
+    handle_path /v1/* {
+        handle /api/version {
+            import reverse_proxy_ollama
+        }
+        handle /api/tags {
+            import reverse_proxy_ollama
+        }
+        handle /api/show {
+            import reverse_proxy_ollama
+        }
+        handle /api/generate {
+            import reverse_proxy_ollama
+        }
+        handle /models {
+            import reverse_proxy_litellm
+        }
+        handle /chat/completions {
+            import reverse_proxy_litellm
+        }
+    }
+
+    # All other traffic
+    handle_path /* {
+        basicauth {
+            guest {$BCRYPT_HASH}
+        }
+        reverse_proxy http://ollama-webui:8080  # ollama-webui
+    }
+
+}
