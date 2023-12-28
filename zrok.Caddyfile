@@ -46,9 +46,9 @@ http:// {
 
     # All other traffic
     handle_path /* {
-        basicauth {
-            guest {$BCRYPT_HASH}
-        }
+#        basicauth {
+#            guest {$BCRYPT_HASH}
+#        }
         reverse_proxy http://ollama-webui:8080  # ollama-webui
     }
 
