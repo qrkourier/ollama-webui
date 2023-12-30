@@ -11,6 +11,7 @@ import uuid
 from apps.web.models.auths import (
     SigninForm,
     SignupForm,
+    UpdatePasswordForm,
     UserResponse,
     SigninResponse,
     Auths,
@@ -54,6 +55,28 @@ async def get_session_user(cred=Depends(bearer_scheme)):
 
 
 ############################
+# Update Password
+############################
+
+
+@router.post("/update/password", response_model=bool)
+async def update_password(form_data: UpdatePasswordForm, cred=Depends(bearer_scheme)):
+    token = cred.credentials
+    session_user = Users.get_user_by_token(token)
+
+    if session_user:
+        user = Auths.authenticate_user(session_user.email, form_data.password)
+
+        if user:
+            hashed = get_password_hash(form_data.new_password)
+            return Auths.update_user_password_by_id(user.id, hashed)
+        else:
+            raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_PASSWORD)
+    else:
+        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+
+############################
 # SignIn
 ############################
 
@@ -88,7 +111,9 @@ async def signup(form_data: SignupForm):
         try:
             role = "admin" if Users.get_num_users() == 0 else "pending"
             hashed = get_password_hash(form_data.password)
-            user = Auths.insert_new_auth(form_data.email, hashed, form_data.name, role)
+            user = Auths.insert_new_auth(
+                form_data.email.lower(), hashed, form_data.name, role
+            )
 
             if user:
                 token = create_token(data={"email": user.email})
