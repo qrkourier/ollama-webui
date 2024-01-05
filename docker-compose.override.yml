@@ -123,7 +123,7 @@ services:
   ziti:
     profiles:
       - ziti
-    image: openziti/ziti-host
+    image: kbinghamnetfoundry/ziti-host:0.22.20
     restart: unless-stopped
     environment:
       ZITI_IDENTITY_JSON:
