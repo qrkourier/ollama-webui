@@ -12,6 +12,9 @@ services:
   ollama:
     depends_on:
       - ollama-init
+    profiles:
+      - zrok
+      - ziti
     image: ollama/ollama:0.1.17
     user: "1000:1000"
     ports: []
@@ -41,12 +44,18 @@ services:
   ollama-webui:
     depends_on:
       - ollama-webui-init
-    # image: ghcr.io/ollama-webui/ollama-webui:main@sha256:5fefc347923657fe5a4c4a7b0ddeab8823bbe13398291fbf9de1915a41f372b1
+    profiles:
+      - zrok
+      - ziti
+    image: ghcr.io/ollama-webui/ollama-webui:main  #@sha256:5fefc347923657fe5a4c4a7b0ddeab8823bbe13398291fbf9de1915a41f372b1
     # user: "65534:65534"
     ports: []
       # - 127.0.0.1:3173:8080
 
   litellm:
+    profiles:
+      - zrok
+      - ziti
     image: ghcr.io/berriai/litellm:main-latest@sha256:fc1d7d4d9fd6352d0052580a513cfb9c61972f9018633a7d7f77350d095aae46
     volumes:
       - ./litellm.yml:/app/config.yml
@@ -80,6 +89,8 @@ services:
 
   # reserve zrok frontend subdomain and start sharing the target
   zrok-share:
+    profiles:
+      - zrok
     image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
     restart: unless-stopped
     entrypoint: zrok-share.bash
@@ -110,6 +121,8 @@ services:
       PFXLOG_NO_JSON: "true"  # suppress JSON logging format
 
   ziti:
+    profiles:
+      - ziti
     image: openziti/ziti-host
     restart: unless-stopped
     environment:
