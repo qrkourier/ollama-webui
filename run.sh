@@ -1,5 +1,7 @@
-docker stop ollama-webui || true
-docker rm ollama-webui || true
-docker build -t ollama-webui .
-docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v ollama-webui:/app/backend/data --name ollama-webui --restart always ollama-webui
-docker image prune -f
+#!/usr/bin/env bash
+set -euxo pipefail
+PROFILE=ziti
+docker compose --profile $PROFILE kill --remove-orphans
+docker compose --profile $PROFILE pull
+docker compose --profile $PROFILE up --force-recreate --detach
+docker compose --profile $PROFILE logs --follow

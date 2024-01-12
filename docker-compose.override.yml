@@ -15,7 +15,7 @@ services:
     profiles:
       - zrok
       - ziti
-    image: ollama/ollama:0.1.17
+    image: ollama/ollama:0.1.19
     user: "1000:1000"
     ports: []
       # - "11434:11434"
