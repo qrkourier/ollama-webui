@@ -13,7 +13,7 @@ from apps.web.models.modelfiles import (
     ModelfileResponse,
 )
 
-from utils.utils import get_current_user
+from utils.utils import get_current_user, get_admin_user
 from constants import ERROR_MESSAGES
 
 router = APIRouter()
@@ -24,7 +24,9 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[ModelfileResponse])
-async def get_modelfiles(skip: int = 0, limit: int = 50, user=Depends(get_current_user)):
+async def get_modelfiles(skip: int = 0,
+                         limit: int = 50,
+                         user=Depends(get_current_user)):
     return Modelfiles.get_modelfiles(skip, limit)
 
 
@@ -34,24 +36,17 @@ async def get_modelfiles(skip: int = 0, limit: int = 50, user=Depends(get_curren
 
 
 @router.post("/create", response_model=Optional[ModelfileResponse])
-async def create_new_modelfile(
-    form_data: ModelfileForm, user=Depends(get_current_user)
-):
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
-        )
-
+async def create_new_modelfile(form_data: ModelfileForm,
+                               user=Depends(get_admin_user)):
     modelfile = Modelfiles.insert_new_modelfile(user.id, form_data)
 
     if modelfile:
         return ModelfileResponse(
             **{
                 **modelfile.model_dump(),
-                "modelfile": json.loads(modelfile.modelfile),
-            }
-        )
+                "modelfile":
+                json.loads(modelfile.modelfile),
+            })
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -65,16 +60,17 @@ async def create_new_modelfile(
 
 
 @router.post("/", response_model=Optional[ModelfileResponse])
-async def get_modelfile_by_tag_name(form_data: ModelfileTagNameForm, user=Depends(get_current_user)):
+async def get_modelfile_by_tag_name(form_data: ModelfileTagNameForm,
+                                    user=Depends(get_current_user)):
     modelfile = Modelfiles.get_modelfile_by_tag_name(form_data.tag_name)
 
     if modelfile:
         return ModelfileResponse(
             **{
                 **modelfile.model_dump(),
-                "modelfile": json.loads(modelfile.modelfile),
-            }
-        )
+                "modelfile":
+                json.loads(modelfile.modelfile),
+            })
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -88,14 +84,8 @@ async def get_modelfile_by_tag_name(form_data: ModelfileTagNameForm, user=Depend
 
 
 @router.post("/update", response_model=Optional[ModelfileResponse])
-async def update_modelfile_by_tag_name(
-    form_data: ModelfileUpdateForm, user=Depends(get_current_user)
-):
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
-        )
+async def update_modelfile_by_tag_name(form_data: ModelfileUpdateForm,
+                                       user=Depends(get_admin_user)):
     modelfile = Modelfiles.get_modelfile_by_tag_name(form_data.tag_name)
     if modelfile:
         updated_modelfile = {
@@ -104,15 +94,14 @@ async def update_modelfile_by_tag_name(
         }
 
         modelfile = Modelfiles.update_modelfile_by_tag_name(
-            form_data.tag_name, updated_modelfile
-        )
+            form_data.tag_name, updated_modelfile)
 
         return ModelfileResponse(
             **{
                 **modelfile.model_dump(),
-                "modelfile": json.loads(modelfile.modelfile),
-            }
-        )
+                "modelfile":
+                json.loads(modelfile.modelfile),
+            })
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,14 +115,7 @@ async def update_modelfile_by_tag_name(
 
 
 @router.delete("/delete", response_model=bool)
-async def delete_modelfile_by_tag_name(
-    form_data: ModelfileTagNameForm, user=Depends(get_current_user)
-):
-    if user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
-        )
-
+async def delete_modelfile_by_tag_name(form_data: ModelfileTagNameForm,
+                                       user=Depends(get_admin_user)):
     result = Modelfiles.delete_modelfile_by_tag_name(form_data.tag_name)
     return result

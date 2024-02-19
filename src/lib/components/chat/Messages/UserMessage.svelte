@@ -1,7 +1,10 @@
 <script lang="ts">
+	import dayjs from 'dayjs';
+
 	import { tick } from 'svelte';
 	import Name from './Name.svelte';
 	import ProfileImage from './ProfileImage.svelte';
+	import { modelfiles, settings } from '$lib/stores';
 
 	export let user;
 	export let message;
@@ -42,22 +45,109 @@
 </script>
 
 <div class=" flex w-full">
-	<ProfileImage src={user?.profile_image_url ?? '/user.png'} />
+	<ProfileImage
+		src={message.user
+			? $modelfiles.find((modelfile) => modelfile.tagName === message.user)?.imageUrl ?? '/user.png'
+			: user?.profile_image_url ?? '/user.png'}
+	/>
 
 	<div class="w-full overflow-hidden">
 		<div class="user-message">
-			<Name>You</Name>
+			<Name>
+				{#if message.user}
+					{#if $modelfiles.map((modelfile) => modelfile.tagName).includes(message.user)}
+						{$modelfiles.find((modelfile) => modelfile.tagName === message.user)?.title}
+					{:else}
+						You <span class=" text-gray-500 text-sm font-medium">{message?.user ?? ''}</span>
+					{/if}
+				{:else if $settings.showUsername}
+					{user.name}
+				{:else}
+					You
+				{/if}
+
+				{#if message.timestamp}
+					<span class=" invisible group-hover:visible text-gray-400 text-xs font-medium">
+						{dayjs(message.timestamp * 1000).format('DD/MM/YYYY HH:mm')}
+					</span>
+				{/if}
+			</Name>
 		</div>
 
 		<div
 			class="prose chat-{message.role} w-full max-w-full dark:prose-invert prose-headings:my-0 prose-p:my-0 prose-p:-mb-4 prose-pre:my-0 prose-table:my-0 prose-blockquote:my-0 prose-img:my-0 prose-ul:-my-4 prose-ol:-my-4 prose-li:-my-3 prose-ul:-mb-6 prose-ol:-mb-6 prose-li:-mb-4 whitespace-pre-line"
 		>
 			{#if message.files}
-				<div class="my-3 w-full flex overflow-x-auto space-x-2">
+				<div class="my-2.5 w-full flex overflow-x-auto gap-2 flex-wrap">
 					{#each message.files as file}
 						<div>
 							{#if file.type === 'image'}
 								<img src={file.url} alt="input" class=" max-h-96 rounded-lg" draggable="false" />
+							{:else if file.type === 'doc'}
+								<button
+									class="h-16 w-[15rem] flex items-center space-x-3 px-2.5 dark:bg-gray-600 rounded-xl border border-gray-200 dark:border-none text-left"
+									type="button"
+									on:click={() => {
+										if (file?.url) {
+											window.open(file?.url, '_blank').focus();
+										}
+									}}
+								>
+									<div class="p-2.5 bg-red-400 text-white rounded-lg">
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+											class="w-6 h-6"
+										>
+											<path
+												fill-rule="evenodd"
+												d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75 2.25a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z"
+												clip-rule="evenodd"
+											/>
+											<path
+												d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z"
+											/>
+										</svg>
+									</div>
+
+									<div class="flex flex-col justify-center -space-y-0.5">
+										<div class=" dark:text-gray-100 text-sm font-medium line-clamp-1">
+											{file.name}
+										</div>
+
+										<div class=" text-gray-500 text-sm">Document</div>
+									</div>
+								</button>
+							{:else if file.type === 'collection'}
+								<button
+									class="h-16 w-[15rem] flex items-center space-x-3 px-2.5 dark:bg-gray-600 rounded-xl border border-gray-200 dark:border-none text-left"
+									type="button"
+								>
+									<div class="p-2.5 bg-red-400 text-white rounded-lg">
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											viewBox="0 0 24 24"
+											fill="currentColor"
+											class="w-6 h-6"
+										>
+											<path
+												d="M7.5 3.375c0-1.036.84-1.875 1.875-1.875h.375a3.75 3.75 0 0 1 3.75 3.75v1.875C13.5 8.161 14.34 9 15.375 9h1.875A3.75 3.75 0 0 1 21 12.75v3.375C21 17.16 20.16 18 19.125 18h-9.75A1.875 1.875 0 0 1 7.5 16.125V3.375Z"
+											/>
+											<path
+												d="M15 5.25a5.23 5.23 0 0 0-1.279-3.434 9.768 9.768 0 0 1 6.963 6.963A5.23 5.23 0 0 0 17.25 7.5h-1.875A.375.375 0 0 1 15 7.125V5.25ZM4.875 6H6v10.125A3.375 3.375 0 0 0 9.375 19.5H16.5v1.125c0 1.035-.84 1.875-1.875 1.875h-9.75A1.875 1.875 0 0 1 3 20.625V7.875C3 6.839 3.84 6 4.875 6Z"
+											/>
+										</svg>
+									</div>
+
+									<div class="flex flex-col justify-center -space-y-0.5">
+										<div class=" dark:text-gray-100 text-sm font-medium line-clamp-1">
+											{file?.title ?? `#${file.name}`}
+										</div>
+
+										<div class=" text-gray-500 text-sm">Collection</div>
+									</div>
+								</button>
 							{/if}
 						</div>
 					{/each}
@@ -149,7 +239,7 @@
 						{/if}
 
 						<button
-							class="invisible group-hover:visible p-1 rounded dark:hover:bg-gray-800 transition edit-user-message-button"
+							class="invisible group-hover:visible p-1 rounded dark:hover:text-white transition edit-user-message-button"
 							on:click={() => {
 								editMessageHandler();
 							}}
@@ -171,7 +261,7 @@
 						</button>
 
 						<button
-							class="invisible group-hover:visible p-1 rounded dark:hover:bg-gray-800 transition"
+							class="invisible group-hover:visible p-1 rounded dark:hover:text-white transition"
 							on:click={() => {
 								copyToClipboard(message.content);
 							}}

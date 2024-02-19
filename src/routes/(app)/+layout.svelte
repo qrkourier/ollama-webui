@@ -13,13 +13,24 @@
 
 	import { getOpenAIModels } from '$lib/apis/openai';
 
-	import { user, showSettings, settings, models, modelfiles, prompts } from '$lib/stores';
+	import {
+		user,
+		showSettings,
+		settings,
+		models,
+		modelfiles,
+		prompts,
+		documents,
+		tags
+	} from '$lib/stores';
 	import { REQUIRED_OLLAMA_VERSION, WEBUI_API_BASE_URL } from '$lib/constants';
 
 	import SettingsModal from '$lib/components/chat/SettingsModal.svelte';
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import { checkVersion } from '$lib/utils';
 	import ShortcutsModal from '$lib/components/chat/ShortcutsModal.svelte';
+	import { getDocs } from '$lib/apis/documents';
+	import { getAllChatTags } from '$lib/apis/chats';
 
 	let ollamaVersion = '';
 	let loaded = false;
@@ -37,19 +48,17 @@
 				return [];
 			}))
 		);
-		// If OpenAI API Key exists
-		if ($settings.OPENAI_API_KEY) {
-			const openAIModels = await getOpenAIModels(
-				$settings.OPENAI_API_BASE_URL ?? 'https://api.openai.com/v1',
-				$settings.OPENAI_API_KEY
-			).catch((error) => {
-				console.log(error);
-				toast.error(error);
-				return null;
-			});
 
-			models.push(...(openAIModels ? [{ name: 'hr' }, ...openAIModels] : []));
-		}
+		// $settings.OPENAI_API_BASE_URL ?? 'https://api.openai.com/v1',
+		// 		$settings.OPENAI_API_KEY
+
+		const openAIModels = await getOpenAIModels(localStorage.token).catch((error) => {
+			console.log(error);
+			return null;
+		});
+
+		models.push(...(openAIModels ? [{ name: 'hr' }, ...openAIModels] : []));
+
 		return models;
 	};
 
@@ -95,11 +104,11 @@
 
 			console.log();
 			await settings.set(JSON.parse(localStorage.getItem('settings') ?? '{}'));
+
 			await modelfiles.set(await getModelfiles(localStorage.token));
-
 			await prompts.set(await getPrompts(localStorage.token));
-
-			console.log($modelfiles);
+			await documents.set(await getDocs(localStorage.token));
+			await tags.set(await getAllChatTags(localStorage.token));
 
 			modelfiles.subscribe(async () => {
 				// should fetch models
@@ -259,7 +268,7 @@
 									Trouble accessing Ollama?
 									<a
 										class=" text-black dark:text-white font-semibold underline"
-										href="https://github.com/ollama-webui/ollama-webui#troubleshooting"
+										href="https://github.com/open-webui/open-webui#troubleshooting"
 										target="_blank"
 									>
 										Click here for help.
@@ -342,7 +351,7 @@
 		{/if}
 
 		<div
-			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-800 min-h-screen overflow-auto flex flex-row"
+			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 min-h-screen overflow-auto flex flex-row"
 		>
 			<Sidebar />
 			<SettingsModal bind:show={$showSettings} />

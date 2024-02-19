@@ -9,10 +9,10 @@ import os
 import aiohttp
 import json
 
+from utils.misc import calculate_sha256, get_gravatar_url
 
-from utils.misc import calculate_sha256
-
-from config import OLLAMA_API_BASE_URL
+from config import OLLAMA_API_BASE_URL, DATA_DIR, UPLOAD_DIR
+from constants import ERROR_MESSAGES
 
 
 router = APIRouter()
@@ -96,8 +96,7 @@ async def download(
     file_name = parse_huggingface_url(url)
 
     if file_name:
-        os.makedirs("./uploads", exist_ok=True)
-        file_path = os.path.join("./uploads", f"{file_name}")
+        file_path = f"{UPLOAD_DIR}/{file_name}"
 
         return StreamingResponse(
             download_file_stream(url, file_path, file_name),
@@ -108,25 +107,29 @@ async def download(
 
 
 @router.post("/upload")
-async def upload(file: UploadFile = File(...)):
-    os.makedirs("./uploads", exist_ok=True)
-    file_path = os.path.join("./uploads", file.filename)
+def upload(file: UploadFile = File(...)):
+    file_path = f"{UPLOAD_DIR}/{file.filename}"
 
-    async def file_write_stream():
-        total = 0
-        total_size = file.size
+    # Save file in chunks
+    with open(file_path, "wb+") as f:
+        for chunk in file.file:
+            f.write(chunk)
+
+    def file_process_stream():
+        total_size = os.path.getsize(file_path)
         chunk_size = 1024 * 1024
-
-        done = False
         try:
-            with open(file_path, "wb+") as f:
-                while True:
-                    chunk = file.file.read(chunk_size)
+            with open(file_path, "rb") as f:
+                total = 0
+                done = False
+
+                while not done:
+                    chunk = f.read(chunk_size)
                     if not chunk:
-                        break
-                    f.write(chunk)
+                        done = True
+                        continue
+
                     total += len(chunk)
-                    done = total_size == total
                     progress = round((total / total_size) * 100, 2)
 
                     res = {
@@ -134,7 +137,6 @@ async def upload(file: UploadFile = File(...)):
                         "total": total_size,
                         "completed": total,
                     }
-
                     yield f"data: {json.dumps(res)}\n\n"
 
                 if done:
@@ -152,13 +154,21 @@ async def upload(file: UploadFile = File(...)):
                             "name": file.filename,
                         }
                         os.remove(file_path)
-
                         yield f"data: {json.dumps(res)}\n\n"
                     else:
-                        raise "Ollama: Could not create blob, Please try again."
+                        raise Exception(
+                            "Ollama: Could not create blob, Please try again."
+                        )
 
         except Exception as e:
             res = {"error": str(e)}
             yield f"data: {json.dumps(res)}\n\n"
 
-    return StreamingResponse(file_write_stream(), media_type="text/event-stream")
+    return StreamingResponse(file_process_stream(), media_type="text/event-stream")
+
+
+@router.get("/gravatar")
+async def get_gravatar(
+    email: str,
+):
+    return get_gravatar_url(email)

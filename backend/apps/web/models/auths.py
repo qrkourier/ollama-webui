@@ -4,14 +4,8 @@ import time
 import uuid
 from peewee import *
 
-
 from apps.web.models.users import UserModel, Users
-from utils.utils import (
-    verify_password,
-    get_password_hash,
-    bearer_scheme,
-    create_token,
-)
+from utils.utils import verify_password
 
 from apps.web.internal.db import DB
 
@@ -62,6 +56,15 @@ class SigninResponse(Token, UserResponse):
 class SigninForm(BaseModel):
     email: str
     password: str
+
+
+class ProfileImageUrlForm(BaseModel):
+    profile_image_url: str
+
+
+class UpdateProfileForm(BaseModel):
+    profile_image_url: str
+    name: str
 
 
 class UpdatePasswordForm(BaseModel):
@@ -117,6 +120,15 @@ class AuthsTable:
     def update_user_password_by_id(self, id: str, new_password: str) -> bool:
         try:
             query = Auth.update(password=new_password).where(Auth.id == id)
+            result = query.execute()
+
+            return True if result == 1 else False
+        except:
+            return False
+
+    def update_email_by_id(self, id: str, email: str) -> bool:
+        try:
+            query = Auth.update(email=email).where(Auth.id == id)
             result = query.execute()
 
             return True if result == 1 else False
