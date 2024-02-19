@@ -1,6 +1,8 @@
 volumes:
   ollama_home: {}
   zrok_env: {}
+  caddy_data: {}
+  caddy_config: {}
 
 services:
   ollama-init:
@@ -15,7 +17,7 @@ services:
     profiles:
       - zrok
       - ziti
-    image: ollama/ollama:0.1.20
+    image: ollama/ollama:0.1.24
     user: "1000:1000"
     ports: []
       # - "11434:11434"
@@ -51,17 +53,6 @@ services:
     # user: "65534:65534"
     ports: []
       # - 127.0.0.1:3173:8080
-
-  litellm:
-    profiles:
-      - zrok
-      - ziti
-    image: ghcr.io/berriai/litellm:main-latest@sha256:fc1d7d4d9fd6352d0052580a513cfb9c61972f9018633a7d7f77350d095aae46
-    volumes:
-      - ./litellm.yml:/app/config.yml
-    ports: []
-      # - "11435:8000"
-    command: [ "--config", "/app/config.yml", "--port", "8000", "--num_workers", "8" ]
 
   # set file ownership
   zrok-init:
@@ -123,7 +114,34 @@ services:
   ziti:
     profiles:
       - ziti
-    image: kbinghamnetfoundry/ziti-host:0.22.20
+    image: kbinghamnetfoundry/ziti-host:0.22.21
     restart: unless-stopped
     environment:
       ZITI_IDENTITY_JSON:
+
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    restart: unless-stopped
+    environment:
+      CF_API_TOKEN:
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+      - "127.0.0.1:443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    user: "$PUID:$PGID"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  init:
+    image: busybox
+    command: >
+        chown -R "$PUID:$PGID" /data /config;
+        chmod -R ug=rwX,o-rwx   /data /config;
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
