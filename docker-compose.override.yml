@@ -1,4 +1,5 @@
 volumes:
+  ollama-webui: {}
   ollama_home: {}
   zrok_env: {}
   caddy_data: {}
@@ -17,12 +18,12 @@ services:
     profiles:
       - zrok
       - ziti
-    image: ollama/ollama:0.1.24
     user: "1000:1000"
     ports: []
       # - "11434:11434"
     volumes:
       - ollama_home:/home
+      - ~/Downloads/Cache/ollama-models:/home/models
     environment:
       HOME: /home
       OLLAMA_HOST: "0.0.0.0"
@@ -37,22 +38,57 @@ services:
               capabilities:
                 - gpu
 
-  ollama-webui-init:
+  open-webui-init:
     image: busybox
     volumes:
-      - ollama-webui:/mnt
+      - open-webui:/mnt
     command: chown -Rc 65535:65535 /mnt
 
-  ollama-webui:
+  open-webui:
     depends_on:
-      - ollama-webui-init
+      - open-webui-init
+    expose:
+      - 8080
+    volumes:
+      - ollama-webui:/app/backend/data
+
+  ziti:
     profiles:
-      - zrok
       - ziti
-    image: ghcr.io/ollama-webui/ollama-webui:main  #@sha256:5fefc347923657fe5a4c4a7b0ddeab8823bbe13398291fbf9de1915a41f372b1
-    # user: "65534:65534"
-    ports: []
-      # - 127.0.0.1:3173:8080
+    image: openziti/ziti-host
+    restart: unless-stopped
+    environment:
+      ZITI_IDENTITY_JSON:
+    #command: run-host --verbose=4
+
+  caddy:
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    restart: unless-stopped
+    environment:
+      CF_API_TOKEN:
+    expose:
+      - 80
+      - 443
+      - "443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    user: "$PUID:$PGID"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  init:
+    image: busybox
+    command: >
+        chown -R "$PUID:$PGID" /data /config;
+        chmod -R ug=rwX,o-rwx   /data /config;
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  ## zrok stuff
 
   # set file ownership
   zrok-init:
@@ -110,38 +146,3 @@ services:
       ZROK_SHARE_OPTS:        # additional arguments to "zrok reserve public" command
       ZROK_FRONTENDS:         # "public"
       PFXLOG_NO_JSON: "true"  # suppress JSON logging format
-
-  ziti:
-    profiles:
-      - ziti
-    image: kbinghamnetfoundry/ziti-host:0.22.21
-    restart: unless-stopped
-    environment:
-      ZITI_IDENTITY_JSON:
-
-  caddy:
-    build:
-      context: .
-      dockerfile: caddy.Dockerfile
-    restart: unless-stopped
-    environment:
-      CF_API_TOKEN:
-    ports:
-      - "127.0.0.1:80:80"
-      - "127.0.0.1:443:443"
-      - "127.0.0.1:443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    user: "$PUID:$PGID"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-  init:
-    image: busybox
-    command: >
-        chown -R "$PUID:$PGID" /data /config;
-        chmod -R ug=rwX,o-rwx   /data /config;
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config

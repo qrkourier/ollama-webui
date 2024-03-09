@@ -19,3 +19,19 @@ ollama.bingnet.cloud, ollama.ziti.bingnet.cloud {
 
         reverse_proxy /* http://ollama:11434
 }
+
+www.ollama.bingnet.cloud, www.ollama.ziti.bingnet.cloud {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+
+        log {
+                output stdout
+                format console
+                level INFO
+                #level DEBUG
+        }
+
+        reverse_proxy /* http://open-webui:8080
+}
