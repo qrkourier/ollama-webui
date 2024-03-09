@@ -33,5 +33,5 @@ www.ollama.bingnet.cloud, www.ollama.ziti.bingnet.cloud {
                 #level DEBUG
         }
 
-        reverse_proxy /* http://open-webui:8080
+        reverse_proxy /* http://ziti-open-webui:8080
 }

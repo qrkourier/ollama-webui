@@ -1,3 +1,7 @@
+networks:
+  ollama:
+    driver: bridge
+
 volumes:
   ollama-webui: {}
   ollama_home: {}
@@ -13,6 +17,8 @@ services:
     command: chown -Rc 1000:1000 /home
 
   ollama:
+    networks:
+      - ollama
     depends_on:
       - ollama-init
     profiles:
@@ -45,14 +51,17 @@ services:
     command: chown -Rc 65535:65535 /mnt
 
   open-webui:
+    network_mode: service:ziti-open-webui
     depends_on:
       - open-webui-init
-    expose:
-      - 8080
     volumes:
       - ollama-webui:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=https://ollama.ziti.bingnet.cloud
 
   ziti:
+    networks:
+      - ollama
     profiles:
       - ziti
     image: openziti/ziti-host
@@ -62,6 +71,8 @@ services:
     #command: run-host --verbose=4
 
   caddy:
+    networks:
+      - ollama
     build:
       context: .
       dockerfile: caddy.Dockerfile
@@ -116,6 +127,8 @@ services:
 
   # reserve zrok frontend subdomain and start sharing the target
   zrok-share:
+    networks:
+      - ollama
     profiles:
       - zrok
     image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
