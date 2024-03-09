@@ -1,17 +1,17 @@
 <script lang="ts">
-	import toast from 'svelte-french-toast';
+	import { toast } from 'svelte-sonner';
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
 
 	import { onMount } from 'svelte';
-	import { prompts } from '$lib/stores';
+	import { WEBUI_NAME, prompts } from '$lib/stores';
 	import { createNewPrompt, deletePromptByCommand, getPrompts } from '$lib/apis/prompts';
 	import { error } from '@sveltejs/kit';
 	import { goto } from '$app/navigation';
 
 	let importFiles = '';
 	let query = '';
-
+	let promptsImportInputElement: HTMLInputElement;
 	const sharePrompt = async (prompt) => {
 		toast.success('Redirecting you to OpenWebUI Community');
 
@@ -35,6 +35,12 @@
 		await prompts.set(await getPrompts(localStorage.token));
 	};
 </script>
+
+<svelte:head>
+	<title>
+		{`Prompts | ${$WEBUI_NAME}`}
+	</title>
+</svelte:head>
 
 <div class="min-h-screen max-h-[100dvh] w-full flex justify-center dark:text-white">
 	<div class="flex flex-col justify-between w-full overflow-y-auto">
@@ -202,6 +208,7 @@
 				<div class="flex space-x-2">
 					<input
 						id="prompts-import-input"
+						bind:this={promptsImportInputElement}
 						bind:files={importFiles}
 						type="file"
 						accept=".json"
@@ -235,8 +242,8 @@
 
 					<button
 						class="flex text-xs items-center space-x-1 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 transition"
-						on:click={async () => {
-							document.getElementById('prompts-import-input')?.click();
+						on:click={() => {
+							promptsImportInputElement.click();
 						}}
 					>
 						<div class=" self-center mr-2 font-medium">Import Prompts</div>
@@ -260,7 +267,7 @@
 					<button
 						class="flex text-xs items-center space-x-1 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 transition"
 						on:click={async () => {
-							// document.getElementById('modelfiles-import-input')?.click();
+							// promptsImportInputElement.click();
 							let blob = new Blob([JSON.stringify($prompts)], {
 								type: 'application/json'
 							});

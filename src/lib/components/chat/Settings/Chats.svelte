@@ -15,13 +15,14 @@
 	import { getImportOrigin, convertOpenAIChats } from '$lib/utils';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import toast from 'svelte-french-toast';
+	import { toast } from 'svelte-sonner';
 
 	export let saveSettings: Function;
 	// Chats
 	let saveChatHistory = true;
 	let importFiles;
 	let showDeleteConfirm = false;
+	let chatImportInputElement: HTMLInputElement;
 
 	$: if (importFiles) {
 		console.log(importFiles);
@@ -75,7 +76,9 @@
 
 	const deleteChats = async () => {
 		await goto('/');
-		await deleteAllChats(localStorage.token);
+		await deleteAllChats(localStorage.token).catch((error) => {
+			toast.error(error);
+		});
 		await chats.set(await getChatList(localStorage.token));
 	};
 
@@ -157,11 +160,18 @@
 		<hr class=" dark:border-gray-700" />
 
 		<div class="flex flex-col">
-			<input id="chat-import-input" bind:files={importFiles} type="file" accept=".json" hidden />
+			<input
+				id="chat-import-input"
+				bind:this={chatImportInputElement}
+				bind:files={importFiles}
+				type="file"
+				accept=".json"
+				hidden
+			/>
 			<button
 				class=" flex rounded-md py-2 px-3.5 w-full hover:bg-gray-200 dark:hover:bg-gray-800 transition"
 				on:click={() => {
-					document.getElementById('chat-import-input').click();
+					chatImportInputElement.click();
 				}}
 			>
 				<div class=" self-center mr-3">

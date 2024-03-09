@@ -79,6 +79,8 @@ app.state.CHUNK_SIZE = CHUNK_SIZE
 app.state.CHUNK_OVERLAP = CHUNK_OVERLAP
 app.state.RAG_TEMPLATE = RAG_TEMPLATE
 app.state.RAG_EMBEDDING_MODEL = RAG_EMBEDDING_MODEL
+app.state.TOP_K = 4
+
 app.state.sentence_transformer_ef = (
     embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name=app.state.RAG_EMBEDDING_MODEL,
@@ -106,7 +108,7 @@ class StoreWebForm(CollectionNameForm):
     url: str
 
 
-def store_data_in_vector_db(data, collection_name) -> bool:
+def store_data_in_vector_db(data, collection_name, overwrite: bool = False) -> bool:
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=app.state.CHUNK_SIZE, chunk_overlap=app.state.CHUNK_OVERLAP
     )
@@ -116,6 +118,12 @@ def store_data_in_vector_db(data, collection_name) -> bool:
     metadatas = [doc.metadata for doc in docs]
 
     try:
+        if overwrite:
+            for collection in CHROMA_CLIENT.list_collections():
+                if collection_name == collection.name:
+                    print(f"deleting existing collection {collection_name}")
+                    CHROMA_CLIENT.delete_collection(name=collection_name)
+
         collection = CHROMA_CLIENT.create_collection(
             name=collection_name,
             embedding_function=app.state.sentence_transformer_ef,
@@ -210,23 +218,33 @@ async def get_rag_template(user=Depends(get_current_user)):
     }
 
 
-class RAGTemplateForm(BaseModel):
-    template: str
+@app.get("/query/settings")
+async def get_query_settings(user=Depends(get_admin_user)):
+    return {
+        "status": True,
+        "template": app.state.RAG_TEMPLATE,
+        "k": app.state.TOP_K,
+    }
 
 
-@app.post("/template/update")
-async def update_rag_template(form_data: RAGTemplateForm, user=Depends(get_admin_user)):
-    # TODO: check template requirements
-    app.state.RAG_TEMPLATE = (
-        form_data.template if form_data.template != "" else RAG_TEMPLATE
-    )
+class QuerySettingsForm(BaseModel):
+    k: Optional[int] = None
+    template: Optional[str] = None
+
+
+@app.post("/query/settings/update")
+async def update_query_settings(
+    form_data: QuerySettingsForm, user=Depends(get_admin_user)
+):
+    app.state.RAG_TEMPLATE = form_data.template if form_data.template else RAG_TEMPLATE
+    app.state.TOP_K = form_data.k if form_data.k else 4
     return {"status": True, "template": app.state.RAG_TEMPLATE}
 
 
 class QueryDocForm(BaseModel):
     collection_name: str
     query: str
-    k: Optional[int] = 4
+    k: Optional[int] = None
 
 
 @app.post("/query/doc")
@@ -240,7 +258,10 @@ def query_doc(
             name=form_data.collection_name,
             embedding_function=app.state.sentence_transformer_ef,
         )
-        result = collection.query(query_texts=[form_data.query], n_results=form_data.k)
+        result = collection.query(
+            query_texts=[form_data.query],
+            n_results=form_data.k if form_data.k else app.state.TOP_K,
+        )
         return result
     except Exception as e:
         print(e)
@@ -253,7 +274,7 @@ def query_doc(
 class QueryCollectionsForm(BaseModel):
     collection_names: List[str]
     query: str
-    k: Optional[int] = 4
+    k: Optional[int] = None
 
 
 def merge_and_sort_query_results(query_results, k):
@@ -317,13 +338,16 @@ def query_collection(
             )
 
             result = collection.query(
-                query_texts=[form_data.query], n_results=form_data.k
+                query_texts=[form_data.query],
+                n_results=form_data.k if form_data.k else app.state.TOP_K,
             )
             results.append(result)
         except:
             pass
 
-    return merge_and_sort_query_results(results, form_data.k)
+    return merge_and_sort_query_results(
+        results, form_data.k if form_data.k else app.state.TOP_K
+    )
 
 
 @app.post("/web")
@@ -337,7 +361,7 @@ def store_web(form_data: StoreWebForm, user=Depends(get_current_user)):
         if collection_name == "":
             collection_name = calculate_sha256_string(form_data.url)[:63]
 
-        store_data_in_vector_db(data, collection_name)
+        store_data_in_vector_db(data, collection_name, overwrite=True)
         return {
             "status": True,
             "collection_name": collection_name,
@@ -401,7 +425,7 @@ def get_loader(filename: str, file_content_type: str, file_path: str):
     ]
 
     if file_ext == "pdf":
-        loader = PyPDFLoader(file_path)
+        loader = PyPDFLoader(file_path, extract_images=True)
     elif file_ext == "csv":
         loader = CSVLoader(file_path)
     elif file_ext == "rst":
@@ -423,7 +447,9 @@ def get_loader(filename: str, file_content_type: str, file_path: str):
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ] or file_ext in ["xls", "xlsx"]:
         loader = UnstructuredExcelLoader(file_path)
-    elif file_ext in known_source_ext or file_content_type.find("text/") >= 0:
+    elif file_ext in known_source_ext or (
+        file_content_type and file_content_type.find("text/") >= 0
+    ):
         loader = TextLoader(file_path)
     else:
         loader = TextLoader(file_path)
@@ -486,8 +512,8 @@ def store_doc(
 
 @app.get("/scan")
 def scan_docs_dir(user=Depends(get_admin_user)):
-    try:
-        for path in Path(DOCS_DIR).rglob("./**/*"):
+    for path in Path(DOCS_DIR).rglob("./**/*"):
+        try:
             if path.is_file() and not path.name.startswith("."):
                 tags = extract_folders_after_data_docs(path)
                 filename = path.name
@@ -535,8 +561,8 @@ def scan_docs_dir(user=Depends(get_admin_user)):
                             ),
                         )
 
-    except Exception as e:
-        print(e)
+        except Exception as e:
+            print(e)
 
     return True
 

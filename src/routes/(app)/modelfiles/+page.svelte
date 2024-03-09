@@ -1,11 +1,11 @@
 <script lang="ts">
-	import toast from 'svelte-french-toast';
+	import { toast } from 'svelte-sonner';
 	import fileSaver from 'file-saver';
 	const { saveAs } = fileSaver;
 
 	import { onMount } from 'svelte';
 
-	import { modelfiles, settings, user } from '$lib/stores';
+	import { WEBUI_NAME, modelfiles, settings, user } from '$lib/stores';
 	import { createModel, deleteModel } from '$lib/apis/ollama';
 	import {
 		createNewModelfile,
@@ -16,11 +16,14 @@
 
 	let localModelfiles = [];
 	let importFiles;
-
+	let modelfilesImportInputElement: HTMLInputElement;
 	const deleteModelHandler = async (tagName) => {
 		let success = null;
 
-		success = await deleteModel(localStorage.token, tagName);
+		success = await deleteModel(localStorage.token, tagName).catch((err) => {
+			toast.error(err);
+			return null;
+		});
 
 		if (success) {
 			toast.success(`Deleted ${tagName}`);
@@ -68,6 +71,12 @@
 		}
 	});
 </script>
+
+<svelte:head>
+	<title>
+		{`Modelfiles | ${$WEBUI_NAME}`}
+	</title>
+</svelte:head>
 
 <div class="min-h-screen max-h-[100dvh] w-full flex justify-center dark:text-white">
 	<div class="flex flex-col justify-between w-full overflow-y-auto">
@@ -229,6 +238,7 @@
 				<div class="flex space-x-1">
 					<input
 						id="modelfiles-import-input"
+						bind:this={modelfilesImportInputElement}
 						bind:files={importFiles}
 						type="file"
 						accept=".json"
@@ -256,8 +266,8 @@
 
 					<button
 						class="flex text-xs items-center space-x-1 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-200 transition"
-						on:click={async () => {
-							document.getElementById('modelfiles-import-input')?.click();
+						on:click={() => {
+							modelfilesImportInputElement.click();
 						}}
 					>
 						<div class=" self-center mr-2 font-medium">Import Modelfiles</div>
