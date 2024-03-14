@@ -67,7 +67,7 @@ services:
     dns:
       - 127.0.0.1
       - 1.1.1.1
-    user: root
+    user: root  # required to create TPROXY routes
     cap_add:
-      - NET_ADMIN
+      - NET_ADMIN  # required to create TPROXY  rules
 
