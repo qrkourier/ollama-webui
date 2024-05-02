@@ -1,0 +1,161 @@
+networks:
+  ollama:
+    driver: bridge
+
+volumes:
+  ollama-webui: {}
+  ollama_home: {}
+  zrok_env: {}
+  caddy_data: {}
+  caddy_config: {}
+
+services:
+  ollama-init:
+    image: busybox
+    volumes:
+      - ollama_home:/home
+    command: chown -Rc 1000:1000 /home
+
+  ollama:
+    networks:
+      - ollama
+    depends_on:
+      - ollama-init
+    profiles:
+      - zrok
+      - ziti
+    user: "1000:1000"
+    ports: []
+      # - "11434:11434"
+    volumes:
+      - ollama_home:/home
+      - ~/Downloads/Cache/ollama-models:/home/models
+    environment:
+      HOME: /home
+      OLLAMA_HOST: "0.0.0.0"
+      OLLAMA_ORIGINS: "*"
+      OLLAMA_MODELS: /home/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+
+  open-webui-init:
+    image: busybox
+    volumes:
+      - open-webui:/mnt
+    command: chown -Rc 65535:65535 /mnt
+
+  open-webui:
+    network_mode: service:ziti-open-webui
+    depends_on:
+      - open-webui-init
+    volumes:
+      - ollama-webui:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=https://ollama.ziti.bingnet.cloud
+
+  ziti:
+    networks:
+      - ollama
+    profiles:
+      - ziti
+    image: openziti/ziti-host
+    restart: unless-stopped
+    environment:
+      ZITI_IDENTITY_JSON:
+    #command: run-host --verbose=4
+
+  caddy:
+    networks:
+      - ollama
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    restart: unless-stopped
+    environment:
+      CF_API_TOKEN:
+    expose:
+      - 80
+      - 443
+      - "443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    user: "$PUID:$PGID"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  init:
+    image: busybox
+    command: >
+        chown -R "$PUID:$PGID" /data /config;
+        chmod -R ug=rwX,o-rwx   /data /config;
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  ## zrok stuff
+
+  # set file ownership
+  zrok-init:
+    image: busybox
+    # matches uid:gid of "nobody" in zrok container image
+    command: chown -Rc 65534:65534 /mnt/
+    user: root
+    volumes:
+      - zrok_env:/mnt
+
+  # enable zrok environment
+  zrok-enable:
+    image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
+    depends_on:
+      zrok-init:
+        condition: service_completed_successfully
+    entrypoint: zrok-enable.bash
+    volumes:
+      - zrok_env:/mnt
+    environment:
+      STATE_DIRECTORY: /mnt
+      ZROK_ENABLE_TOKEN:
+      ZROK_API_ENDPOINT: https://ctrl.ken.demo.openziti.org
+      ZROK_ENVIRONMENT_NAME:  ollama-webui
+
+  # reserve zrok frontend subdomain and start sharing the target
+  zrok-share:
+    networks:
+      - ollama
+    profiles:
+      - zrok
+    image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
+    restart: unless-stopped
+    entrypoint: zrok-share.bash
+    depends_on:
+      zrok-enable:
+        condition: service_completed_successfully
+    volumes:
+      - zrok_env:/mnt
+      - ./zrok.Caddyfile:/Caddyfile
+    environment:
+      # internal configuration
+      STATE_DIRECTORY: /mnt  # zrok homedir in container
+      BCRYPT_HASH:           # Caddy reads this to set basic auth
+
+      # most relevant options
+      ZROK_UNIQUE_NAME:     ollama
+      ZROK_BACKEND_MODE:    caddy
+      ZROK_TARGET:          /Caddyfile
+      ZROK_INSECURE:        # "--insecure" if proxy target has unverifiable TLS server certificate
+      ZROK_OAUTH_PROVIDER:  # google, github
+      ZROK_OAUTH_EMAILS:    # allow space-separated list of OAuth email addresses or @domain.tld
+      ZROK_BASIC_AUTH:      # username:password, mutually-exclusive with ZROK_OAUTH_PROVIDER
+
+      # least relevant options
+      ZROK_VERBOSE:           # "--verbose"
+      ZROK_SHARE_OPTS:        # additional arguments to "zrok reserve public" command
+      ZROK_FRONTENDS:         # "public"
+      PFXLOG_NO_JSON: "true"  # suppress JSON logging format
