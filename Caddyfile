@@ -1,10 +1,10 @@
 {
-        email autumnvale@qrk.us
+        email ollama-caddy@qrk.us
         acme_ca https://acme-v02.api.letsencrypt.org/directory
         #acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
 
-ollama.bingnet.cloud, ollama.ziti.bingnet.cloud {
+ollama.ziti.bingnet.cloud {
         tls {
                 dns cloudflare {env.CF_API_TOKEN}
                 resolvers 1.1.1.1
@@ -20,7 +20,7 @@ ollama.bingnet.cloud, ollama.ziti.bingnet.cloud {
         reverse_proxy /* http://ollama:11434
 }
 
-www.ollama.bingnet.cloud, www.ollama.ziti.bingnet.cloud {
+cockpit.mira.bingnet.cloud {
         tls {
                 dns cloudflare {env.CF_API_TOKEN}
                 resolvers 1.1.1.1
@@ -33,5 +33,86 @@ www.ollama.bingnet.cloud, www.ollama.ziti.bingnet.cloud {
                 #level DEBUG
         }
 
-        reverse_proxy /* http://ziti-open-webui:8080
+        reverse_proxy /* {
+                to https://{$HOST_GATEWAY}:9090
+                transport http {
+                        tls
+                        tls_insecure_skip_verify
+                }
+        }
+}
+
+www.ollama.mira.bingnet.cloud, www.ollama.ziti.bingnet.cloud {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+
+        log {
+                output stdout
+                format console
+                level INFO
+                #level DEBUG
+        }
+
+        reverse_proxy /* http://ziti-router:8080
+}
+
+output.stable.ziti.bingnet.cloud {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+
+        log {
+                output stdout
+                format console
+                level INFO
+                #level DEBUG
+        }
+
+        @local {
+                remote_ip 127.0.0.1
+                remote_ip ::1
+        }
+
+        handle @local {
+                root * /mnt/comfy
+                file_server browse
+        }
+
+        respond "Access denied" 403 {
+        }
+}
+
+auto.stable.ziti.bingnet.cloud {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+
+        log {
+                output stdout
+                format console
+                level INFO
+                #level DEBUG
+        }
+        reverse_proxy /* http://auto.stable.private
+
+}
+
+comfy.stable.ziti.bingnet.cloud {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+
+        log {
+                output stdout
+                format console
+                level INFO
+                #level DEBUG
+        }
+        reverse_proxy /* http://comfy.stable.private
+
 }

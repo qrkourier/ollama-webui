@@ -5,9 +5,9 @@ networks:
 volumes:
   ollama-webui: {}
   ollama_home: {}
-  zrok_env: {}
   caddy_data: {}
   caddy_config: {}
+  ziti-router: {}
 
 services:
   ollama-init:
@@ -17,13 +17,14 @@ services:
     command: chown -Rc 1000:1000 /home
 
   ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
     networks:
       - ollama
     depends_on:
       - ollama-init
-    profiles:
-      - zrok
-      - ziti
+    # profiles:
+    #   - ziti
     user: "1000:1000"
     ports: []
       # - "11434:11434"
@@ -51,7 +52,9 @@ services:
     command: chown -Rc 65535:65535 /mnt
 
   open-webui:
-    network_mode: service:ziti-open-webui
+    image: ghcr.io/open-webui/open-webui:latest
+    restart: unless-stopped
+    network_mode: service:ziti-router
     depends_on:
       - open-webui-init
     volumes:
@@ -62,34 +65,36 @@ services:
   ziti:
     networks:
       - ollama
-    profiles:
-      - ziti
-    image: openziti/ziti-host
+    # profiles:
+    #   - ziti
+    image: docker.io/openziti/ziti-host:latest
     restart: unless-stopped
     environment:
       ZITI_IDENTITY_JSON:
     #command: run-host --verbose=4
 
   caddy:
-    networks:
-      - ollama
+    #profiles:
+    #  - caddy
+    network_mode: service:ziti-router
+    # networks:
+    #   - ollama
     build:
       context: .
       dockerfile: caddy.Dockerfile
     restart: unless-stopped
     environment:
       CF_API_TOKEN:
-    expose:
-      - 80
-      - 443
-      - "443/udp"
+    # expose:
+    #   - 80
+    #   - 443
+    #   - "443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+      - /home/kbingham/Sites/stable-diffusion-webui-docker/output/comfy:/mnt/comfy
     user: "$PUID:$PGID"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
   init:
     image: busybox
     command: >
@@ -99,63 +104,75 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
-  ## zrok stuff
-
-  # set file ownership
-  zrok-init:
+  ziti-router-chown:
     image: busybox
-    # matches uid:gid of "nobody" in zrok container image
-    command: chown -Rc 65534:65534 /mnt/
-    user: root
+    command: chown -R ${ZIGGY_UID:-2171} /mnt
     volumes:
-      - zrok_env:/mnt
+      - ziti-router:/mnt
 
-  # enable zrok environment
-  zrok-enable:
-    image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
-    depends_on:
-      zrok-init:
-        condition: service_completed_successfully
-    entrypoint: zrok-enable.bash
-    volumes:
-      - zrok_env:/mnt
-    environment:
-      STATE_DIRECTORY: /mnt
-      ZROK_ENABLE_TOKEN:
-      ZROK_API_ENDPOINT: https://ctrl.ken.demo.openziti.org
-      ZROK_ENVIRONMENT_NAME:  ollama-webui
-
-  # reserve zrok frontend subdomain and start sharing the target
-  zrok-share:
-    networks:
-      - ollama
-    profiles:
-      - zrok
-    image: ${ZROK_CONTAINER_IMAGE:-docker.io/openziti/zrok}
+  ziti-router:
     restart: unless-stopped
-    entrypoint: zrok-share.bash
+    networks:
+      ollama:
+        aliases:
+          - ollama-router.192.168.1.116.xip.bingnet.cloud
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    image: ${ZITI_ROUTER_IMAGE:-openziti/ziti-router}
+    pull_policy: never
     depends_on:
-      zrok-enable:
+      ziti-router-chown:
         condition: service_completed_successfully
     volumes:
-      - zrok_env:/mnt
-      - ./zrok.Caddyfile:/Caddyfile
+      - ziti-router:/mnt
+    working_dir: /mnt
+    # these declared vars pass through to container and should be assigned in an .env file or exported from parent env
+    # to ensure consistency throughout the compose project
     environment:
-      # internal configuration
-      STATE_DIRECTORY: /mnt  # zrok homedir in container
-      BCRYPT_HASH:           # Caddy reads this to set basic auth
+      # *** these are the important vars to set ***
+      ZITI_CTRL_ADVERTISED_ADDRESS: ziti.bingnet.cloud
+      ZITI_CTRL_ADVERTISED_PORT: 443
+      ZITI_ENROLL_TOKEN:                                              # enrollment token for this router (required)
+      ZITI_ROUTER_ADVERTISED_ADDRESS: ollama-router.192.168.1.116.xip.bingnet.cloud
+      ZITI_ROUTER_ADVERTISED_PORT: ${ZITI_ROUTER_ADVERTISED_PORT:-80}
+      ZITI_ROUTER_MODE: tproxy
+      # *** less relevant vars below ***
+      ZITI_ROUTER_TYPE: edge           # edge, fabric
+      ZITI_ROUTER_NAME: ziti-router    # ensure the computed filenames based on this var are consistent, not based on
+                                       #  ephemeral container id
+      ZITI_BOOTSTRAP_CONFIG: force
+      ZITI_BOOTSTRAP_ENROLLMENT: true  # enroll with controller if "true," overwrite if "force"
+      PFXLOG_NO_JSON: true
+      ZITI_TIME_FORMAT: utc
+    command: run config.yml
+    ports:
+      # ensure this port matches the value of ZITI_ROUTER_ADVERTISED_PORT in the container
+      - ${ZITI_INTERFACE:-0.0.0.0}:${ZITI_ROUTER_ADVERTISED_PORT:-80}:${ZITI_ROUTER_ADVERTISED_PORT:-80}
+      - 0.0.0.0:443:443/tcp
+    expose:
+      - ${ZITI_ROUTER_ADVERTISED_PORT:-80}
+      - 8080  # open-webui, not desired, but Docker bridge is open on the inside?
+      - 80    # caddy ports
+      - 443
+      - "443/udp"
+    healthcheck:
+      test:
+        - CMD
+        - ziti
+        - agent
+        - stats
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
-      # most relevant options
-      ZROK_UNIQUE_NAME:     ollama
-      ZROK_BACKEND_MODE:    caddy
-      ZROK_TARGET:          /Caddyfile
-      ZROK_INSECURE:        # "--insecure" if proxy target has unverifiable TLS server certificate
-      ZROK_OAUTH_PROVIDER:  # google, github
-      ZROK_OAUTH_EMAILS:    # allow space-separated list of OAuth email addresses or @domain.tld
-      ZROK_BASIC_AUTH:      # username:password, mutually-exclusive with ZROK_OAUTH_PROVIDER
-
-      # least relevant options
-      ZROK_VERBOSE:           # "--verbose"
-      ZROK_SHARE_OPTS:        # additional arguments to "zrok reserve public" command
-      ZROK_FRONTENDS:         # "public"
-      PFXLOG_NO_JSON: "true"  # suppress JSON logging format
+    # Additional config for other containers using this router as a transparent intercepting proxy sidecar and default
+    # nameserver - dns, user, cap_add are required when ZITI_ROUTER_MODE=tproxy (see adjacent README.md for TPROXY
+    # example)
+    #
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    user: root  # required to create TPROXY routes
+    cap_add:
+      - NET_ADMIN  # required to create TPROXY  rules
