@@ -1,19 +1,20 @@
-import { dev } from '$app/environment';
+import { browser, dev } from '$app/environment';
 // import { version } from '../../package.json';
 
 export const APP_NAME = 'Open WebUI';
-export const WEBUI_BASE_URL = dev ? `http://${location.hostname}:8080` : ``;
 
+export const WEBUI_HOSTNAME = browser ? (dev ? `${location.hostname}:8080` : ``) : '';
+export const WEBUI_BASE_URL = browser ? (dev ? `http://${WEBUI_HOSTNAME}` : ``) : ``;
 export const WEBUI_API_BASE_URL = `${WEBUI_BASE_URL}/api/v1`;
 
-export const LITELLM_API_BASE_URL = `${WEBUI_BASE_URL}/litellm/api`;
 export const OLLAMA_API_BASE_URL = `${WEBUI_BASE_URL}/ollama`;
-export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai/api`;
+export const OPENAI_API_BASE_URL = `${WEBUI_BASE_URL}/openai`;
 export const AUDIO_API_BASE_URL = `${WEBUI_BASE_URL}/audio/api/v1`;
 export const IMAGES_API_BASE_URL = `${WEBUI_BASE_URL}/images/api/v1`;
 export const RAG_API_BASE_URL = `${WEBUI_BASE_URL}/rag/api/v1`;
 
 export const WEBUI_VERSION = APP_VERSION;
+export const WEBUI_BUILD_HASH = APP_BUILD_HASH;
 export const REQUIRED_OLLAMA_VERSION = '0.1.16';
 
 export const SUPPORTED_FILE_TYPE = [
@@ -22,6 +23,7 @@ export const SUPPORTED_FILE_TYPE = [
 	'text/plain',
 	'text/csv',
 	'text/xml',
+	'text/html',
 	'text/x-python',
 	'text/css',
 	'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -50,6 +52,8 @@ export const SUPPORTED_FILE_EXTENSIONS = [
 	'h',
 	'c',
 	'cs',
+	'htm',
+	'html',
 	'sql',
 	'log',
 	'ini',
@@ -83,7 +87,10 @@ export const SUPPORTED_FILE_EXTENSIONS = [
 	'csv',
 	'txt',
 	'xls',
-	'xlsx'
+	'xlsx',
+	'pptx',
+	'ppt',
+	'msg'
 ];
 
 // Source: https://kit.svelte.dev/docs/modules#$env-static-public

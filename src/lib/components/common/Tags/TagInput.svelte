@@ -1,32 +1,53 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, getContext } from 'svelte';
+	import { tags } from '$lib/stores';
+	import { toast } from 'svelte-sonner';
 	const dispatch = createEventDispatcher();
 
+	const i18n = getContext('i18n');
+
+	export let label = '';
 	let showTagInput = false;
 	let tagName = '';
+
+	const addTagHandler = async () => {
+		tagName = tagName.trim();
+		if (tagName !== '') {
+			dispatch('add', tagName);
+			tagName = '';
+			showTagInput = false;
+		} else {
+			toast.error($i18n.t(`Invalid Tag`));
+		}
+	};
 </script>
 
-<div class="flex space-x-1 pl-1.5">
+<div class="flex {showTagInput ? 'flex-row-reverse' : ''}">
 	{#if showTagInput}
 		<div class="flex items-center">
 			<input
 				bind:value={tagName}
-				class=" cursor-pointer self-center text-xs h-fit bg-transparent outline-none line-clamp-1 w-[4rem]"
-				placeholder="Add a tag"
-			/>
-
-			<button
-				type="button"
-				on:click={() => {
-					dispatch('add', tagName);
-					tagName = '';
-					showTagInput = false;
+				class=" px-2 cursor-pointer self-center text-xs h-fit bg-transparent outline-none line-clamp-1 w-[5.5rem]"
+				placeholder={$i18n.t('Add a tag')}
+				list="tagOptions"
+				on:keydown={(event) => {
+					if (event.key === 'Enter') {
+						addTagHandler();
+					}
 				}}
-			>
+			/>
+			<datalist id="tagOptions">
+				{#each $tags as tag}
+					<option value={tag.name} />
+				{/each}
+			</datalist>
+
+			<button type="button" on:click={addTagHandler}>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					viewBox="0 0 16 16"
 					fill="currentColor"
+					stroke-width="2"
 					class="w-3 h-3"
 				>
 					<path
@@ -37,12 +58,10 @@
 				</svg>
 			</button>
 		</div>
-
-		<!-- TODO: Tag Suggestions -->
 	{/if}
 
 	<button
-		class=" cursor-pointer self-center p-0.5 space-x-1 flex h-fit items-center dark:hover:bg-gray-700 rounded-full transition border dark:border-gray-600 border-dashed"
+		class=" cursor-pointer self-center p-0.5 flex h-fit items-center dark:hover:bg-gray-700 rounded-full transition border dark:border-gray-600 border-dashed"
 		type="button"
 		on:click={() => {
 			showTagInput = !showTagInput;
@@ -61,4 +80,8 @@
 			</svg>
 		</div>
 	</button>
+
+	{#if label && !showTagInput}
+		<span class="text-xs pl-2 self-center">{label}</span>
+	{/if}
 </div>

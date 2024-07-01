@@ -1,7 +1,48 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
 	export let show = false;
 	export let src = '';
 	export let alt = '';
+
+	let mounted = false;
+
+	const downloadImage = (url, filename) => {
+		fetch(url)
+			.then((response) => response.blob())
+			.then((blob) => {
+				const objectUrl = window.URL.createObjectURL(blob);
+				const link = document.createElement('a');
+				link.href = objectUrl;
+				link.download = filename;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
+				window.URL.revokeObjectURL(objectUrl);
+			})
+			.catch((error) => console.error('Error downloading image:', error));
+	};
+
+	const handleKeyDown = (event: KeyboardEvent) => {
+		if (event.key === 'Escape') {
+			console.log('Escape');
+			show = false;
+		}
+	};
+
+	onMount(() => {
+		mounted = true;
+	});
+
+	$: if (mounted) {
+		if (show) {
+			window.addEventListener('keydown', handleKeyDown);
+			document.body.style.overflow = 'hidden';
+		} else {
+			window.removeEventListener('keydown', handleKeyDown);
+			document.body.style.overflow = 'unset';
+		}
+	}
 </script>
 
 {#if show}
@@ -35,10 +76,7 @@
 				<button
 					class=" p-5"
 					on:click={() => {
-						const a = document.createElement('a');
-						a.href = src;
-						a.download = 'Image.png';
-						a.click();
+						downloadImage(src, src.substring(src.lastIndexOf('/') + 1));
 					}}
 				>
 					<svg

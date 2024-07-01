@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
 	import dayjs from 'dayjs';
-	import { onMount } from 'svelte';
+	import { onMount, getContext } from 'svelte';
 
 	import { getDocs, tagDocByName, updateDocByName } from '$lib/apis/documents';
 	import Modal from '../common/Modal.svelte';
@@ -9,6 +9,8 @@
 	import TagInput from '../common/Tags/TagInput.svelte';
 	import Tags from '../common/Tags.svelte';
 	import { addTagById } from '$lib/apis/chats';
+
+	const i18n = getContext('i18n');
 
 	export let show = false;
 	export let selectedDoc;
@@ -73,8 +75,8 @@
 
 <Modal size="sm" bind:show>
 	<div>
-		<div class=" flex justify-between dark:text-gray-300 px-5 py-4">
-			<div class=" text-lg font-medium self-center">Edit Doc</div>
+		<div class=" flex justify-between dark:text-gray-300 px-5 pt-4">
+			<div class=" text-lg font-medium self-center">{$i18n.t('Edit Doc')}</div>
 			<button
 				class="self-center"
 				on:click={() => {
@@ -93,8 +95,6 @@
 				</svg>
 			</button>
 		</div>
-		<hr class=" dark:border-gray-800" />
-
 		<div class="flex flex-col md:flex-row w-full px-5 py-4 md:space-x-4 dark:text-gray-200">
 			<div class=" flex flex-col w-full sm:flex-row sm:justify-center sm:space-x-6">
 				<form
@@ -105,40 +105,30 @@
 				>
 					<div class=" flex flex-col space-y-1.5">
 						<div class="flex flex-col w-full">
-							<div class=" mb-1 text-xs text-gray-500">Name Tag</div>
+							<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Name Tag')}</div>
 
 							<div class="flex flex-1">
 								<div
-									class="bg-gray-200 dark:bg-gray-600 font-bold px-3 py-1 border border-r-0 dark:border-gray-600 rounded-l-lg flex items-center"
+									class="bg-gray-200 dark:bg-gray-800 font-bold px-3 py-0.5 border border-r-0 dark:border-gray-800 rounded-l-xl flex items-center"
 								>
 									#
 								</div>
 								<input
-									class="w-full rounded-r-lg py-2.5 px-4 text-sm dark:text-gray-300 dark:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-500 outline-none"
+									class="w-full rounded-r-xl py-2 px-4 text-sm dark:text-gray-300 dark:bg-gray-850 disabled:text-gray-500 dark:disabled:text-gray-500 outline-none"
 									type="text"
 									bind:value={doc.name}
 									autocomplete="off"
 									required
 								/>
 							</div>
-
-							<!-- <div class="flex-1">
-								<input
-									class="w-full rounded py-2 px-4 text-sm dark:text-gray-300 dark:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-500 outline-none"
-									type="text"
-									bind:value={doc.name}
-									autocomplete="off"
-									required
-								/>
-							</div> -->
 						</div>
 
 						<div class="flex flex-col w-full">
-							<div class=" mb-1 text-xs text-gray-500">Title</div>
+							<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Title')}</div>
 
 							<div class="flex-1">
 								<input
-									class="w-full rounded-lg py-2.5 px-4 text-sm dark:text-gray-300 dark:bg-gray-800 outline-none"
+									class="w-full rounded-xl py-2 px-4 text-sm dark:text-gray-300 dark:bg-gray-850 outline-none"
 									type="text"
 									bind:value={doc.title}
 									autocomplete="off"
@@ -148,7 +138,7 @@
 						</div>
 
 						<div class="flex flex-col w-full">
-							<div class=" mb-1.5 text-xs text-gray-500">Tags</div>
+							<div class=" mb-2 text-xs text-gray-500">{$i18n.t('Tags')}</div>
 
 							<Tags {tags} addTag={addTagHandler} deleteTag={deleteTagHandler} />
 						</div>
@@ -156,10 +146,10 @@
 
 					<div class="flex justify-end pt-5 text-sm font-medium">
 						<button
-							class=" px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-gray-100 transition rounded"
+							class=" px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-gray-100 transition rounded-lg"
 							type="submit"
 						>
-							Save
+							{$i18n.t('Save')}
 						</button>
 					</div>
 				</form>
