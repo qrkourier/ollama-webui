@@ -3,17 +3,16 @@ networks:
     driver: bridge
 
 volumes:
-  ollama-webui: {}
-  ollama_home: {}
   caddy_data: {}
   caddy_config: {}
   ziti-router: {}
+  restic_cache: {}
 
 services:
   ollama-init:
     image: busybox
     volumes:
-      - ollama_home:/home
+      - ollama:/home
     command: chown -Rc 1000:1000 /home
 
   ollama:
@@ -29,7 +28,7 @@ services:
     ports: []
       # - "11434:11434"
     volumes:
-      - ollama_home:/home
+      - ollama:/home
       - ~/Downloads/Cache/ollama-models:/home/models
     environment:
       HOME: /home
@@ -57,10 +56,10 @@ services:
     network_mode: service:ziti-router
     depends_on:
       - open-webui-init
-    volumes:
-      - ollama-webui:/app/backend/data
     environment:
       - OLLAMA_BASE_URL=https://ollama.ziti.bingnet.cloud
+    labels:
+      restic-compose-backup.volumes: true
 
   ziti:
     networks:
@@ -176,3 +175,15 @@ services:
     user: root  # required to create TPROXY routes
     cap_add:
       - NET_ADMIN  # required to create TPROXY  rules
+
+  backup:
+    image: docker.io/kbinghamnetfoundry/restic-compose-backup
+    env_file:
+      - .env.backup
+    labels:
+      restic-compose-backup.volumes: false
+    volumes:
+      # Map in docker socket
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Map restic cache
+      - restic_cache:/cache
